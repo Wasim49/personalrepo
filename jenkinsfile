@@ -1,0 +1,47 @@
+pipeline {
+    agent {
+        label 'jenkinslinuxnode'    // Give the name of self hosted jenkins agent. These are the names jenkinslinuxnode or jenkinswindowsnode
+    }
+    parameters {
+        booleanParam(name: 'WHAT_IF_ONLY', defaultValue: false, description: 'Run what-if simulation only?')
+    }
+    environment {
+        RG_NAME = '1-d95ac676-playground-sandbox'
+        AZURE_CREDENTIALS = credentials('7843c371-4b37-49f7-add8-074470749ea0') // Give the Credential ID of the azure service principle, find this here http://localhost:8080/manage/credentials/store/system/domain/_/
+    }   
+    stages {
+        stage('Checkout Code') {
+            steps {
+                checkout scm
+            }
+        }
+        stage('Deploy to Azure') {
+            steps {
+                script {
+                    if (params.WHAT_IF_ONLY) {
+                        echo "Running Azure What-If analysis..."
+                        sh '''
+                        az --version
+                        az login --service-principal -u $AZURE_SUBSCRIPTION_CLIENT_ID -p $AZURE_SUBSCRIPTION_CLIENT_SECRET --tenant $AZURE_SUBSCRIPTION_TENANT_ID
+                        az deployment group create \
+                            --resource-group ${RG_NAME} \
+                            --template-file working-example-codes/vm/vm.bicep \
+                            --parameters working-example-codes/vm/vm.bicepparam \
+                            --what-if
+                        '''
+                    } else {
+                        echo "Deploying Azure Infrastructure..."
+                        sh '''
+                        az --version
+                        az login --service-principal -u $AZURE_SUBSCRIPTION_CLIENT_ID -p $AZURE_SUBSCRIPTION_CLIENT_SECRET --tenant $AZURE_SUBSCRIPTION_TENANT_ID
+                        az deployment group create \
+                            --resource-group ${RG_NAME} \
+                            --template-file working-example-codes/vm/vm.bicep \
+                            --parameters working-example-codes/vm/vm.bicepparam
+                        '''
+                    }
+                }
+            }
+        }
+    }
+}
